@@ -13,11 +13,13 @@ const char* password = "networking407";
 
 // mqtt 브로커 주소 & mqtt 브로커에 접속하는 클라이언트 이름
 const char* mqtt_server = "192.168.15.79";
-const char* clientName = "Client1"; // 중복되지 않도록 수정
+const char* clientName = "Client12"; // 중복되지 않도록 수정
 
 DHTesp dht;                      // 온습도 처리 객체
 WiFiClient espClient;            // WiFi 접속 객체
 PubSubClient client(espClient);  // mqtt 클라이언트 객체
+
+int danger = 0;
 
 // WiFi 접속-----------------------------------
 void setup_wifi() {
@@ -44,6 +46,7 @@ void setup_wifi() {
   dht.setup(D4, DHTesp::DHT11); 
 }
 
+
 // mqtt 토픽 수신/처리 콜백 함수-----------------------
 // pBuffer: 토픽에 담긴 데이터 저장
 void callback(char* topic, byte* payload, unsigned int uLen) {
@@ -56,13 +59,29 @@ void callback(char* topic, byte* payload, unsigned int uLen) {
    Serial.println(pBuffer); // 1, 0
 
    // 토픽으로 들어온 데이터가 0[1]이면 LED RED[GREEN]
+
+   if(pBuffer[0] == '0'){
+    danger = 0;
+   }
+   else if(pBuffer[0] == '1'){
+    danger = 1;
+   }
+   
+   /*
    if(pBuffer[0]=='0'){         // LED_RED(ON), LED_GREEN(OFF)
       digitalWrite(14, HIGH);
       digitalWrite(12, LOW);
+      Serial.print("$CLEAR\r\n");
+      Serial.print("$GO 1 4\r\n");
+      Serial.print("$PRINT DANGER\r\n");
    }else if(pBuffer[0]=='1'){   // LED_RED(OFF), LED_GREEN(ON)
       digitalWrite(14, LOW);
       digitalWrite(12, HIGH);
+      Serial.print("$CLEAR\r\n");
+      Serial.print("$GO 1 4\r\n");
+      Serial.print("$PRINT NORMAL\r\n");
    }  
+   */
 }
 
 // mqtt 브로커에 접속 시도-------------------------------
@@ -89,9 +108,11 @@ void reconnect() {
 
 // 아두이노 설정, WiFi AP 및 mqtt 브로커 접속-----------
 void setup() {
+
+  
   pinMode(14, OUTPUT);     // GPIO 14번 핀을 출력모드(LED)로 설정 (RED)
   pinMode(12, OUTPUT);     // GPIO 12번 핀을 출력모드(LED)로 설정 (GREEN)
-  Serial.begin(115200); 
+  Serial.begin(9600); 
   setup_wifi();            // WiFi AP 접속
   client.setServer(mqtt_server, 1883); // mqtt 브로커에 접속
   client.setCallback(callback); // mqtt 브로커거 보낸 토픽 수신(callback 함수 등록)
@@ -99,6 +120,8 @@ void setup() {
 
 // mqtt 브로커 접속 시도-------------------------------
  void loop() {
+
+  
   if (!client.connected()) {
     reconnect();
   }
@@ -111,7 +134,26 @@ void setup() {
   dtostrf(hum, 5,2, pHumBuf); 
 
   //led 제어
+   char str[40];
 
+   if (danger == 0){
+      sprintf(str, "$PRINT DANGER\r\n");
+      digitalWrite(14, HIGH);
+      digitalWrite(12, LOW);
+      Serial.print("$CLEAR\r\n");
+      Serial.print("$GO 1 4\r\n");
+
+  }
+  else if(danger == 1){
+      sprintf(str, "$PRINT NORMAL\r\n");
+      digitalWrite(14, LOW);
+      digitalWrite(12, HIGH);
+      Serial.print("$CLEAR\r\n");
+      Serial.print("$GO 1 4\r\n");
+
+  }
+  Serial.print(str);
+   
   
   // mqtt 브로커에 전송할 메시지(JSON 형식) 생성
   sprintf(message, "{\"tmp\":%s,\"hum\":%s}", pTmpBuf, pHumBuf);   
